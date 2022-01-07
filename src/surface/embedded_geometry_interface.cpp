@@ -294,6 +294,7 @@ void EmbeddedGeometryInterface::computeEdgeCotanWeights() {
   vertexPositionsQ.ensureHave();
 
   edgeCotanWeights = EdgeData<double>(mesh);
+  int numInvalid = 0;
 
   for (Edge e : mesh.edges()) {
     double cotSum = 0.;
@@ -312,10 +313,21 @@ void EmbeddedGeometryInterface::computeEdgeCotanWeights() {
       Vector3 vecL = pC - pA;
 
       double cotValue = dot(vecR, vecL) / norm(cross(vecR, vecL));
+      if (!isfinite(cotValue)) {
+#ifndef GC_NLINALG_DEBUG
+        //std::cout << "computeEdgeCotanWeights: Triangle is infinite!" << std::endl;
+#endif
+        cotValue = 0;
+        numInvalid++;
+      }
       cotSum += cotValue / 2;
     }
 
     edgeCotanWeights[e] = cotSum;
+  }
+
+  if (numInvalid > 0) {
+    std::cout << "computeEdgeCotanWeights: There were " << numInvalid << " invalid triangles!" << std::endl;
   }
 }
 

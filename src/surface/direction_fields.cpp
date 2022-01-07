@@ -24,6 +24,8 @@ SparseMatrix<std::complex<double>> computeVertexConnectionLaplacian(IntrinsicGeo
   geometry.requireEdgeCotanWeights();
   geometry.requireTransportVectorsAlongHalfedge();
 
+  int numInvalid = 0;
+
   std::vector<Eigen::Triplet<std::complex<double>>> triplets;
   for (Halfedge he : mesh.halfedges()) {
 
@@ -33,10 +35,22 @@ SparseMatrix<std::complex<double>> computeVertexConnectionLaplacian(IntrinsicGeo
     // Levi-Civita connection between vertices
     Vector2 rot = geometry.transportVectorsAlongHalfedge[he.twin()].pow(nSym);
     double weight = geometry.edgeCotanWeights[he.edge()];
+    if (!rot.isFinite() || !isfinite(weight)) {
+#ifndef GC_NLINALG_DEBUG
+      //std::cout << "computeVertexConnectionLaplacian: Oopsie at " << iTip << " x " << iTail << std::endl;
+#endif
+      weight = 0;
+      rot = Vector2::zero();
+      numInvalid++;
+    }
 
     triplets.emplace_back(iTail, iTail, weight);
     triplets.emplace_back(iTail, iTip, -weight * rot);
   }
+  if (numInvalid > 0) {
+    std::cout << "computeVertexConnectionLaplacian: " << numInvalid << " invalid entried." << std::endl;
+  }
+
   // assemble matrix from triplets
   Eigen::SparseMatrix<std::complex<double>> vertexConnectionLaplacian(mesh.nVertices(), mesh.nVertices());
   vertexConnectionLaplacian.setFromTriplets(triplets.begin(), triplets.end());
